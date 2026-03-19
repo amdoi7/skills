@@ -2,34 +2,42 @@
 
 ## Goals
 
-- Newcomers understand intent without hidden context
-- Future maintainers find entry points quickly
+- Newcomers understand domain intent without hidden context
+- Future maintainers can find business rules before framework glue
 - Implementation explains why it is written this way
 
 ## Design Principles
 
-### KISS & YAGNI
+### Domain Language First
 
-- Keep solutions simple and obvious
-- Don't implement speculative features
-- Challenge every abstraction: "Is this necessary now?"
+- Prefer names from the business domain over framework words like `handler`, `manager`, or `util`.
+- If something is hard to name, the design may still be muddy.
+- Keep terms consistent across code, tests, and discussions.
 
-### SOLID
+### Contexts Before Layers
 
-| Principle | Guidance |
-|-----------|----------|
-| Single Responsibility | One class/function = one reason to change |
-| Open/Closed | Extend via composition, not modification |
-| Liskov Substitution | Subtypes must honor parent contracts |
-| Interface Segregation | Small, focused interfaces |
-| Dependency Inversion | Depend on abstractions, not concretions |
+- Split code by capability or bounded context before adding technical layers.
+- A package should answer "which part of the business lives here?" before "which framework role lives here?"
+- Add `service`, `repository`, or `schema` modules only when they hide real complexity.
 
-### Unix Philosophy & Python Zen
+### Types Carry Meaning
 
-- Do one thing well
-- Explicit is better than implicit
-- Flat is better than nested
-- Readability counts
+- Prefer `StrEnum`, `dataclass`, small value objects, and precise aliases over raw `str` and `dict`.
+- Make illegal states harder to represent.
+- Validate and normalize at the boundary, then pass trusted objects inward.
+
+### Invariants vs Policies
+
+- Put invariants in constructors, value objects, and domain methods.
+- Keep changeable business rules in explicit policy objects or application orchestration.
+- Do not bury policy branches inside generic helpers.
+
+### Python Zen in Service of the Model
+
+- Explicit is better than implicit.
+- Flat is better than nested.
+- Readability counts.
+- Practicality beats purity, but not at the cost of obscuring business meaning.
 
 ## Code Style
 
@@ -52,13 +60,13 @@ def _validate_input(data: dict) -> bool: ...
 ### Function Design
 
 ```python
-# Good: single responsibility, clear flow
-def process_order(order: Order) -> Receipt:
-    validated = validate_order(order)
-    charged = charge_payment(validated)
-    return create_receipt(charged)
+# Good: the function name says what business step happens
+def place_order(command: PlaceOrderCommand) -> Order:
+    order = Order.create(command.customer_id, command.items)
+    credit_policy.check(order.total, command.credit_limit)
+    return repository.save(order)
 
-# Bad: doing too much, unclear responsibility
+# Bad: mixed transport, policy, and infrastructure concerns
 def handle_order(order, user, inventory, payment_gateway, emailer): ...
 ```
 

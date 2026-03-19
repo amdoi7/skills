@@ -7,17 +7,21 @@ Ask these questions when reviewing Python code:
 ### Design & Structure
 
 - [ ] Does naming reflect domain intent?
-- [ ] Are there unnecessary cross-layer dependencies?
+- [ ] Is the module split driven by bounded context or capability rather than framework layer names?
+- [ ] Are there unnecessary cross-context or cross-layer dependencies?
 - [ ] Is there a clearer data structure choice?
 - [ ] Is there over-abstraction or hidden magic?
 - [ ] Is the entry point obvious for users?
 - [ ] Are changes localized and reversible?
+- [ ] Are schemas/DTOs used only at boundaries instead of mirroring the domain everywhere?
+- [ ] Are invariants kept in the model while changeable policies stay outside?
 
 ### Error Handling
 
 - [ ] Does error handling preserve context?
 - [ ] Are only specific exceptions caught (no bare `except:`)?
 - [ ] Are exceptions re-raised with `from` to preserve chain?
+- [ ] Are invariant violations, policy rejections, and infrastructure failures distinguished clearly?
 
 ### Code Quality
 
@@ -144,8 +148,8 @@ def process_if_active(item: Item) -> None:
 
 **Solution:**
 1. Identify distinct responsibilities
-2. Extract to separate classes
-3. Compose via dependency injection
+2. Separate domain rules, orchestration, and adapters
+3. Compose via dependency injection or explicit wiring
 
 ### Stringly-Typed Code
 

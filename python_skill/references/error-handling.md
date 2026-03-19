@@ -1,177 +1,162 @@
 # Error Handling
 
-> References:
-> - https://frostming.com/posts/2023/error-handling/
-> - https://blog.yanli.one/ideas-about-exception-catch
-> - https://blog.miguelgrinberg.com/post/the-ultimate-guide-to-error-handling-in-python
-
 ## Goals
 
-- Make failure paths explicit and understandable
-- Catch exceptions only where you can recover
-- Preserve error context for debugging
+- Make failure paths explicit and understandable.
+- Preserve domain meaning when a request is rejected.
+- Translate infrastructure failures at boundaries without losing debugging context.
+
+## Failure Taxonomy
+
+Use one vocabulary across the skill:
+
+| Error Kind | Meaning | Typical Handling |
+| --- | --- | --- |
+| `InvariantViolation` | The model would become invalid or an impossible state was observed | Prevent with parsing and constructors; if it still happens in trusted code, treat it as a bug or corrupted input |
+| `PolicyViolation` | Expected business rejection from a changeable rule | Return a clear business error to the caller |
+| `NotFoundError` | Required entity or relation is absent | Translate at the boundary, often to `404` or a domain result |
+| `ConcurrencyConflict` | Optimistic lock or stale write conflict | Retry or surface a conflict response |
+| `InfrastructureError` | DB, network, file, queue, or SDK failure | Wrap with context, retry selectively, or translate to a safe public message |
 
 ## Core Principles
 
 | Principle | Description |
-|-----------|-------------|
-| Catch specific | Never bare `except:`, always specify exception type |
-| Preserve context | Use `raise ... from e` to chain exceptions |
-| Fail fast | Don't catch if you can't handle |
-| EAFP over LBYL | "Easier to Ask Forgiveness than Permission" |
+| --- | --- |
+| Catch specific | Never bare `except:`; catch only exceptions you can handle |
+| Preserve context | Use `raise ... from e` when translating errors |
+| Separate invariant from policy | Invalid state and business rejection are not the same failure |
+| Catch at boundaries | Handle exceptions where you can recover, retry, or translate |
+| Use EAFP with care | Prefer direct operations, but not when failure is expected and expensive |
 
-## EAFP vs LBYL
-
-```python
-# LBYL (Look Before You Leap) - 多次检查
-if key in dictionary:
-    if dictionary[key] is not None:
-        value = dictionary[key]
-        process(value)
-
-# EAFP (Easier to Ask Forgiveness) - 更 Pythonic ✅
-try:
-    value = dictionary[key]
-    process(value)
-except KeyError:
-    pass  # or handle missing key
-```
-
-**When to prefer LBYL:**
-- Check is cheap and failure is common
-- Side effects on failure are problematic
-
-## Exception Chaining
+## Shared Exception Hierarchy
 
 ```python
-# ✅ Preserve original context with `from`
-try:
-    data = json.loads(raw_data)
-except json.JSONDecodeError as e:
-    raise ValidationError(f"Invalid JSON in config") from e
-
-# ✅ Suppress chain when irrelevant (rare)
-try:
-    value = cache[key]
-except KeyError:
-    raise ConfigNotFoundError(key) from None
-
-# ❌ Never lose context
-try:
-    do_something()
-except SomeError:
-    raise OtherError("failed")  # Original traceback lost!
-```
-
-## Batch vs Pipeline Error Handling
-
-### Batch: Isolate Per-Item Failures
-
-```python
-results = []
-errors = []
-
-for item in items:
-    try:
-        result = process(item)
-        results.append(result)
-    except ProcessingError as e:
-        errors.append((item, e))
-        logger.warning("Failed to process {}: {}", item.id, e)
-
-if errors:
-    logger.error("Failed {} of {} items", len(errors), len(items))
-```
-
-### Pipeline: Fail Fast
-
-```python
-def pipeline(data: RawData) -> FinalResult:
-    # Each step can fail, stops pipeline
-    validated = validate(data)      # May raise ValidationError
-    transformed = transform(validated)  # May raise TransformError
-    enriched = enrich(transformed)  # May raise EnrichmentError
-    return finalize(enriched)
-```
-
-## Exception Design
-
-### Module-Specific Exceptions
-
-```python
-# app/core/exceptions.py
 class AppError(Exception):
-    """Base for all app exceptions."""
+    """Base class for application-visible failures."""
 
-class NotFoundError(AppError):
-    """Resource not found."""
-    def __init__(self, resource: str, id: Any):
-        self.resource = resource
-        self.id = id
-        super().__init__(f"{resource} {id} not found")
 
-class ValidationError(AppError):
-    """Input validation failed."""
-    def __init__(self, field: str, message: str):
-        self.field = field
-        self.message = message
-        super().__init__(f"{field}: {message}")
+class DomainError(AppError):
+    """Base class for domain-level failures."""
 
-# app/users/exceptions.py
-from app.core.exceptions import NotFoundError
 
-class UserNotFoundError(NotFoundError):
-    def __init__(self, user_id: int):
-        super().__init__("User", user_id)
-        self.user_id = user_id
+class InvariantViolation(DomainError):
+    """State or input makes the model invalid."""
+
+
+class PolicyViolation(DomainError):
+    """Business rule rejection that callers may handle."""
+
+
+class NotFoundError(DomainError):
+    """Expected absence of a required entity or relation."""
+
+
+class ConcurrencyConflict(DomainError):
+    """Write failed because another actor updated the same record."""
+
+
+class InfrastructureError(AppError):
+    """External system failure."""
 ```
 
-### Exception with Structured Data
+## Preserve Context When Crossing Boundaries
+
+```python
+try:
+    row = await session.execute(stmt)
+except sqlalchemy.exc.SQLAlchemyError as e:
+    raise InfrastructureError("load order failed") from e
+```
+
+Use `from None` only when the original exception adds no value to the reader.
+
+## Invariants vs Policies
 
 ```python
 from dataclasses import dataclass
 
-@dataclass
-class ErrorDetail:
-    code: str
-    message: str
-    field: str | None = None
 
-class APIError(Exception):
-    def __init__(self, status_code: int, details: list[ErrorDetail]):
-        self.status_code = status_code
-        self.details = details
-        super().__init__(f"API Error {status_code}: {details}")
+@dataclass(frozen=True)
+class Money:
+    cents: int
 
-# Usage
-raise APIError(400, [
-    ErrorDetail("invalid_email", "Email format is invalid", "email"),
-    ErrorDetail("required", "This field is required", "name"),
-])
+    def __post_init__(self) -> None:
+        if self.cents < 0:
+            raise InvariantViolation("money cannot be negative")
+
+
+class CreditPolicy:
+    def check(self, total: Money, limit: Money) -> None:
+        if total.cents > limit.cents:
+            raise PolicyViolation("credit limit exceeded")
 ```
 
-## Context Managers for Cleanup
+- `Money(-1)` is an invariant breach.
+- "This VIP can exceed the limit during promotion week" is a policy choice.
+
+## Translate at the Boundary
+
+```python
+@app.exception_handler(PolicyViolation)
+async def policy_violation_handler(request: Request, exc: PolicyViolation) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={"error": "policy_violation", "message": str(exc)},
+    )
+
+
+@app.exception_handler(InfrastructureError)
+async def infrastructure_handler(request: Request, exc: InfrastructureError) -> JSONResponse:
+    logger.exception("Infrastructure failure", exc_info=exc)
+    return JSONResponse(
+        status_code=503,
+        content={"error": "service_unavailable"},
+    )
+```
+
+## Batch vs Pipeline
+
+Use the failure mode that matches the use case.
+
+```python
+def pipeline(data: RawData) -> FinalResult:
+    validated = validate(data)
+    transformed = transform(validated)
+    enriched = enrich(transformed)
+    return finalize(enriched)
+```
+
+```python
+results: list[Result] = []
+errors: list[tuple[str, Exception]] = []
+
+for item in items:
+    try:
+        results.append(process(item))
+    except PolicyViolation as e:
+        errors.append((item.id, e))
+```
+
+## Context Managers and Cleanup
 
 ```python
 from contextlib import contextmanager
+
 
 @contextmanager
 def managed_resource(name: str):
     resource = acquire_resource(name)
     try:
         yield resource
-    except Exception:
-        logger.error("Error while using {}", name)
-        raise  # Re-raise after logging
+    except SpecificError as e:
+        raise InfrastructureError(f"{name} failed") from e
     finally:
-        release_resource(resource)  # Always cleanup
-
-# Usage
-with managed_resource("db_connection") as conn:
-    conn.execute(query)
+        release_resource(resource)
 ```
 
-## Async Exception Handling
+## Async Retries
+
+Retry only exceptions that are transient and well understood.
 
 ```python
 async def fetch_with_retry(url: str, retries: int = 3) -> dict:
@@ -181,18 +166,18 @@ async def fetch_with_retry(url: str, retries: int = 3) -> dict:
         try:
             async with asyncio.timeout(10):
                 return await fetch(url)
-        except TimeoutError:
-            last_error = TimeoutError(f"Timeout fetching {url}")
-            logger.warning("Attempt {} timed out", attempt + 1)
+        except TimeoutError as e:
+            last_error = e
         except aiohttp.ClientError as e:
             last_error = e
-            logger.warning("Attempt {} failed: {}", attempt + 1, e)
 
         if attempt < retries - 1:
-            await asyncio.sleep(2 ** attempt)  # Exponential backoff
+            await asyncio.sleep(2 ** attempt)
 
-    raise FetchError(f"Failed after {retries} attempts") from last_error
+    raise InfrastructureError(f"fetch failed after {retries} attempts") from last_error
 ```
+
+Do not retry `PolicyViolation`, `InvariantViolation`, or programmer bugs.
 
 ## Anti-Patterns
 
@@ -200,31 +185,24 @@ async def fetch_with_retry(url: str, retries: int = 3) -> dict:
 # ❌ Bare except
 try:
     do_something()
-except:  # Catches SystemExit, KeyboardInterrupt too!
+except:
     pass
 
-# ❌ Catching too broad
+# ❌ Hide bugs behind broad recovery
 try:
     value = int(user_input)
-except Exception:  # Hides bugs
+except Exception:
     value = 0
 
-# ❌ Silent failures
-try:
-    important_operation()
-except SomeError:
-    pass  # Error swallowed, debugging nightmare
-
-# ❌ Redundant exception handling
+# ❌ Lose causal chain
 try:
     do_something()
-except SomeError as e:
-    raise e  # Just let it propagate naturally
+except SomeError:
+    raise OtherError("failed")
 
-# ✅ Correct patterns
+# ✅ Translate specific failures
 try:
     value = int(user_input)
-except ValueError:
-    logger.warning("Invalid input: {}", user_input)
-    value = default_value
+except ValueError as e:
+    raise InvariantViolation("invalid integer input") from e
 ```
