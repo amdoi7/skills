@@ -1,73 +1,78 @@
 ---
 name: idiomatic-go
-description: Idiomatic Go development guidance for writing safe, efficient, and concurrent code. Use when writing new Go code, refactoring, reviewing, designing APIs, working with concurrency/context, or setting up Go projects. Triggers on .go files, go.mod, Go-related questions, HTTP handlers, goroutines, channels, error handling discussions.
+description: Idiomatic Go guidance for modeling domain types clearly, keeping package boundaries simple, and writing safe concurrent code. Use when writing or refactoring Go, reviewing design, shaping APIs or package boundaries, working with goroutines and context, or when code is becoming stringly typed, over-abstracted, or concurrency-heavy.
 ---
 
 # Idiomatic Go
 
-Concise guidance for writing idiomatic Go code that is safe, efficient, and leverages Go's concurrency model correctly.
-
-> "I fear not the man who has practiced 10,000 kicks once, but I fear the man who has practiced one kick 10,000 times." — Bruce Lee
+Use this skill to keep Go code obvious, boundary-aware, and safe under concurrency.
 
 ## Decision Order
 
-1. Correctness and safety (no goroutine leaks, no data races)
-2. Clarity and simplicity (readable > clever)
-3. Performance (profile first, optimize with intent)
-4. Extensibility (interfaces at boundaries)
+1. Model the domain and boundaries clearly
+2. Preserve correctness and concurrency safety
+3. Keep the common path simple for callers
+4. Optimize after measurement
+5. Add abstractions only when they hide real complexity
 
 ## Core Principles
 
-- **Simplicity**: Go's strength is simplicity. Resist abstraction until it's earned
-- **Explicit > Implicit**: No hidden control flow, no magic
-- **Accept interfaces, return structs**: Flexibility in, concrete out
-- **Handle errors at boundaries**: Don't propagate raw errors across packages
-- **Context flows down**: Pass `context.Context` as first parameter
-- **Deep modules**: 简单接口 + 强大功能，复杂性下沉
-- **Eliminate special cases**: 通过设计消除边界情况，而非条件判断
-- **Parse, don't validate**: 边界层解析成强类型，内部代码信任上游数据
+- **Domain language first**: package names, type names, and method names should reveal the business concept before the transport or storage mechanism.
+- **Parse at boundaries**: convert raw input into strong types and trusted values as early as possible.
+- **Concrete inside, interfaces at boundaries**: add interfaces where packages or systems meet, not for every type.
+- **Recoverable failures are errors**: use `error` for domain and infrastructure failures; reserve `panic` for programmer bugs or impossible states after invariants are guaranteed.
+- **Context flows down**: pass `context.Context` as the first parameter on request-scoped work.
+- **Deep modules**: keep common call paths simple and hide the hard parts behind small APIs.
+- **Eliminate special cases**: redesign the data shape or API before adding more branches.
 
-> "Bad programmers worry about the code. Good programmers worry about data structures." — Linus Torvalds
->
-> "Make illegal states unrepresentable." — Yaron Minsky
+## Workflow
+
+1. Determine the primary task:
+   - **Modeling, package split, API design, or review**: read [references/philosophy.md](references/philosophy.md).
+   - **Errors, retries, or public error translation**: read [references/error-handling.md](references/error-handling.md).
+   - **Goroutines, deadlines, or cancellation**: read [references/context-cancellation.md](references/context-cancellation.md).
+   - **Shared state or primitive choice**: read [references/memory-model-sync.md](references/memory-model-sync.md).
+   - **DB pooling and deadlines**: read [references/database-sql-pooling-timeouts.md](references/database-sql-pooling-timeouts.md).
+   - **Runtime incident triage**: read [references/runtime-observability.md](references/runtime-observability.md).
+   - **Performance work**: read [references/performance.md](references/performance.md).
+   - **HTTP servers and middleware**: read [references/http-middleware.md](references/http-middleware.md).
+   - **Testing strategy**: read [references/testing.md](references/testing.md).
+2. Load only the reference files needed for the task.
+3. Keep the common path simple; reach for advanced mechanisms only when evidence demands them.
 
 ## Quick Reference
 
-| Topic                  | When to Use                                                 | Reference                                                                                  |
-| ---------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| **Design Philosophy**  | Code review, refactoring, design decisions                  | [references/philosophy.md](references/philosophy.md)                                       |
-| Context & Cancellation | Goroutines, HTTP handlers, timeouts                         | [references/context-cancellation.md](references/context-cancellation.md)                   |
-| Runtime Observability  | Runtime triage, pprof correlation, GC/scheduler diagnostics | [references/runtime-observability.md](references/runtime-observability.md)                 |
-| Memory Model & Sync    | Happens-before checks, primitive selection                  | [references/memory-model-sync.md](references/memory-model-sync.md)                         |
-| database/sql Pooling   | Pool sizing, queueing diagnosis, timeout propagation        | [references/database-sql-pooling-timeouts.md](references/database-sql-pooling-timeouts.md) |
-| Performance            | High-throughput paths, memory-sensitive                     | [references/performance.md](references/performance.md)                                     |
-| HTTP & Middleware      | API servers, clients                                        | [references/http-middleware.md](references/http-middleware.md)                             |
-| Error Handling         | All code paths                                              | [references/error-handling.md](references/error-handling.md)                               |
-| File Systems           | Config loading, embeds                                      | [references/filesystems.md](references/filesystems.md)                                     |
-| Testing                | Quality gates                                               | [references/testing.md](references/testing.md)                                             |
+| Topic | Use When | Reference |
+| --- | --- | --- |
+| Design Philosophy | Code review, refactoring, module boundaries | [references/philosophy.md](references/philosophy.md) |
+| Context & Cancellation | Goroutines, HTTP handlers, timeouts | [references/context-cancellation.md](references/context-cancellation.md) |
+| Error Handling | Boundary translation, retries, error semantics | [references/error-handling.md](references/error-handling.md) |
+| Memory Model & Sync | Happens-before checks, primitive selection | [references/memory-model-sync.md](references/memory-model-sync.md) |
+| `database/sql` Pooling | Pool sizing, queueing, timeout propagation | [references/database-sql-pooling-timeouts.md](references/database-sql-pooling-timeouts.md) |
+| Runtime Observability | Triage, pprof correlation, GC or scheduler diagnostics | [references/runtime-observability.md](references/runtime-observability.md) |
+| Performance | Allocation or throughput work | [references/performance.md](references/performance.md) |
+| HTTP & Middleware | API servers, clients, request context | [references/http-middleware.md](references/http-middleware.md) |
+| File Systems | Config loading, embeds, path handling | [references/filesystems.md](references/filesystems.md) |
+| Testing | Table-driven tests, fakes, fuzzing | [references/testing.md](references/testing.md) |
 
 ## Essential Patterns
 
-### Context & Cancellation
+### Parse at the Boundary
 
 ```go
-// Always respect context cancellation
-func fetchData(ctx context.Context, url string) ([]byte, error) {
-    req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-    if err != nil {
-        return nil, fmt.Errorf("create request: %w", err)
-    }
+type OrderID string
 
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil {
-        return nil, fmt.Errorf("execute request: %w", err)
+func ParseOrderID(raw string) (OrderID, error) {
+    if raw == "" {
+        return "", errors.New("empty order id")
     }
-    defer resp.Body.Close()
-
-    return io.ReadAll(resp.Body)
+    return OrderID(raw), nil
 }
+```
 
-// Context-aware channel send (no goroutine leaks)
+### Context-Aware Concurrency
+
+```go
 func send(ctx context.Context, ch chan<- int, val int) error {
     select {
     case ch <- val:
@@ -78,279 +83,31 @@ func send(ctx context.Context, ch chan<- int, val int) error {
 }
 ```
 
-### Concurrency Patterns
+### Wrap Errors at Trust Boundaries
 
 ```go
-// Worker pool with backpressure and error collection
-func processItems(ctx context.Context, items []Item) error {
-    g, ctx := errgroup.WithContext(ctx)
-    g.SetLimit(10) // Backpressure: max 10 concurrent
-
-    for _, item := range items {
-        item := item // Capture for closure (Go < 1.22)
-        g.Go(func() error {
-            return processItem(ctx, item)
-        })
-    }
-
-    return g.Wait() // Returns first error, cancels others
-}
-
-// Singleflight for cache stampede prevention
-var group singleflight.Group
-
-func getData(key string) (interface{}, error) {
-    v, err, _ := group.Do(key, func() (interface{}, error) {
-        return expensiveFetch(key)
-    })
-    return v, err
-}
-```
-
-### Runtime Observability
-
-```go
-// Read stable runtime metrics and convert cumulative values to rates.
-func sampleRuntime() {
-    samples := []metrics.Sample{
-        {Name: "/gc/heap/live:bytes"},
-        {Name: "/gc/pauses:seconds"},
-        {Name: "/sched/latencies:seconds"},
-        {Name: "/sync/mutex/wait/total:seconds"},
-    }
-    metrics.Read(samples)
-
-    // Correlate metric anomalies with pprof snapshots.
-    // e.g. mutex wait up -> capture mutex/block profile
-}
-```
-
-**Rules**:
-- Prefer **rate/percentile** over raw cumulative numbers.
-- Use metrics for detection, `pprof` for root-cause confirmation.
-- Keep an incident map: metric symptom -> profile to capture.
-
-### Memory Model & Sync Selection
-
-```go
-// Safe publication via atomic pointer to immutable snapshot.
-type Config struct{ Timeout time.Duration }
-
-var current atomic.Pointer[Config]
-
-func Publish(c Config) {
-    cc := c
-    current.Store(&cc)
-}
-
-func LoadConfig() Config {
-    if p := current.Load(); p != nil {
-        return *p
-    }
-    return Config{Timeout: time.Second}
-}
-```
-
-**Rules**:
-- Every shared write/read pair must have a clear happens-before edge.
-- Do not mix atomic and non-atomic access on the same field.
-- Start with `Mutex`; upgrade to `RWMutex/atomic` only after contention evidence.
-
-### database/sql Pooling & Context Timeouts
-
-```go
-func queryUser(ctx context.Context, db *sql.DB, id int64) (User, error) {
-    qctx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
-    defer cancel()
-
-    var u User
-    err := db.QueryRowContext(qctx,
-        `SELECT id, email FROM users WHERE id = $1`, id,
-    ).Scan(&u.ID, &u.Email)
-    return u, err
-}
-```
-
-**Rules**:
-- Always set pool limits (`MaxOpen`, `MaxIdle`, lifetime/idle time).
-- Every DB operation must use `Context` with deadline.
-- Watch `DB.Stats().WaitCount/WaitDuration` for pool saturation.
-
-### Error Handling
-
-```go
-// Wrap errors with context at boundaries
 func (s *Service) ProcessOrder(ctx context.Context, id string) error {
-    order, err := s.repo.Get(ctx, id)
+    orderID, err := ParseOrderID(id)
     if err != nil {
-        return fmt.Errorf("get order %s: %w", id, err)
+        return fmt.Errorf("parse order id: %w", err)
     }
 
-    if err := s.validate(order); err != nil {
-        return fmt.Errorf("validate order: %w", err)
-    }
-
-    return nil
-}
-
-// Check error types with errors.Is/As
-if errors.Is(err, context.DeadlineExceeded) {
-    // Handle timeout
-}
-
-var pathErr *os.PathError
-if errors.As(err, &pathErr) {
-    // Access pathErr.Path, pathErr.Op
-}
-
-// ⚠️ Typed nil gotcha - NEVER return typed nil
-func getError() error {
-    var err *MyError = nil
-    return err // BUG: err != nil because interface has type
-}
-// ✅ Correct: return nil explicitly
-func getError() error {
-    var err *MyError = nil
-    if err != nil {
-        return err
+    if err := s.repo.Process(ctx, orderID); err != nil {
+        return fmt.Errorf("process order %s: %w", orderID, err)
     }
     return nil
-}
-```
-
-### HTTP & Middleware
-
-```go
-// Interface-based middleware
-type Middleware func(http.Handler) http.Handler
-
-func Chain(h http.Handler, mws ...Middleware) http.Handler {
-    for i := len(mws) - 1; i >= 0; i-- {
-        h = mws[i](h)
-    }
-    return h
-}
-
-// HTTP client hygiene
-func newClient() *http.Client {
-    return &http.Client{
-        Timeout: 30 * time.Second,
-        Transport: &http.Transport{
-            MaxIdleConns:        100,
-            MaxIdleConnsPerHost: 10,
-            IdleConnTimeout:     90 * time.Second,
-        },
-    }
-}
-```
-
-### Performance Patterns
-
-```go
-// sync.Pool for buffer reuse
-var bufPool = sync.Pool{
-    New: func() interface{} {
-        return new(bytes.Buffer)
-    },
-}
-
-func process(data []byte) {
-    buf := bufPool.Get().(*bytes.Buffer)
-    defer func() {
-        buf.Reset()
-        bufPool.Put(buf)
-    }()
-    // Use buf...
-}
-
-// Sharded locks for concurrent map
-type ShardedMap struct {
-    shards [256]struct {
-        sync.RWMutex
-        m map[string]interface{}
-    }
-}
-
-func (sm *ShardedMap) getShard(key string) *struct {
-    sync.RWMutex
-    m map[string]interface{}
-} {
-    h := fnv.New32a()
-    h.Write([]byte(key))
-    return &sm.shards[h.Sum32()%256]
-}
-```
-
-### Testing
-
-```go
-// Table-driven tests with parallel execution
-func TestProcess(t *testing.T) {
-    tests := []struct {
-        name    string
-        input   string
-        want    string
-        wantErr bool
-    }{
-        {"empty", "", "", true},
-        {"valid", "hello", "HELLO", false},
-    }
-
-    for _, tt := range tests {
-        tt := tt // Capture
-        t.Run(tt.name, func(t *testing.T) {
-            t.Parallel()
-            got, err := Process(tt.input)
-            if (err != nil) != tt.wantErr {
-                t.Errorf("error = %v, wantErr %v", err, tt.wantErr)
-            }
-            if got != tt.want {
-                t.Errorf("got %q, want %q", got, tt.want)
-            }
-        })
-    }
-}
-
-// Fuzzing
-func FuzzParse(f *testing.F) {
-    f.Add("valid input")
-    f.Fuzz(func(t *testing.T, input string) {
-        _, _ = Parse(input) // Should not panic
-    })
 }
 ```
 
 ## Common Pitfalls
 
-### Concurrency & Safety
-
-| Pitfall | Problem | Solution |
-|---------|---------|----------|
-| Goroutine leak | Blocked send/receive forever | Always use `select` with `ctx.Done()` |
-| Data race | Concurrent map access | Use `sync.Map` or mutex-protected map |
-| Typed nil | `var err *MyError = nil; return err` | Return explicit `nil` for interface types |
-| Closure capture | Loop variable captured by reference | `v := v` before closure (Go < 1.22) |
-| Unbuffered channel | Deadlock on single goroutine | Size buffer or use separate sender/receiver |
-| Missing `defer` | Resource leak | `defer closer()` immediately after acquire |
-| Error shadowing | `:=` creates new variable in inner scope | Use `=` or declare explicitly |
-| Metrics misread | Reading cumulative metric as instant signal | Convert counters to rate; use histogram percentiles |
-| Sync primitive mixing | Mixing `atomic` and mutex/plain access on same field | Use one synchronization strategy per field |
-| Missing query deadline | DB calls can hang and pin pool slots | Always use `QueryContext/ExecContext` with timeout |
-| Unbounded DB pool | Traffic bursts overload DB or queue indefinitely | Set `MaxOpenConns` and observe `WaitCount/WaitDuration` |
-
-### Design & Structure (See [philosophy.md](references/philosophy.md))
-
-| Pitfall | Threshold | Solution |
-|---------|-----------|----------|
-| Deep nesting | > 3 levels | Early return, extract functions |
-| Long functions | > 100 lines | Split into smaller focused functions |
-| Too many locals | > 10 variables | Extract struct or split function |
-| Shallow modules | Interface ≈ Implementation | Pull complexity down, simplify API |
-| Defensive defaults | `?? 0` masks bugs | Fail fast, expose upstream errors |
-| Special case handling | Many `if` branches | Redesign to eliminate special cases |
-| Repeated validation | `if x == nil` everywhere | Parse at boundary, trust upstream |
-| Primitive obsession | `string` for ID, `float64` for money | NewType: `type UserID string` |
-| Validate then discard | Check valid but keep raw type | Parse into strong type, carry proof |
+| Pitfall | Problem | Better Direction |
+| --- | --- | --- |
+| `string` and `float64` everywhere | Domain meaning leaks into comments and call sites | Introduce small strong types |
+| Global `handler/service/repo` package trees | Technical structure hides domain boundaries | Split by capability or bounded context first |
+| Interfaces for every type | Shallow abstractions and indirection | Add interfaces only at package or system boundaries |
+| `panic` for expected failures | Callers cannot recover and semantics become unclear | Return typed or wrapped errors |
+| Advanced sync primitives by default | Harder reasoning and weaker invariants | Start with ownership and `Mutex`; optimize later |
 
 ## Tooling
 

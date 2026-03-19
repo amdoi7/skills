@@ -2,6 +2,7 @@
 
 ## Table of Contents
 
+- [Failure Taxonomy](#failure-taxonomy)
 - [Error Fundamentals](#error-fundamentals)
 - [Error Wrapping](#error-wrapping)
 - [Secure Error Handling](#secure-error-handling)
@@ -19,9 +20,23 @@
 | Principle         | Description                                        |
 | ----------------- | -------------------------------------------------- |
 | Errors are values | Treat errors as first-class values, not exceptions |
-| Handle or return  | Either handle an error or return it to caller      |
+| Handle or return  | Either handle a recoverable error or return it     |
 | Wrap with context | Add context when propagating errors up the stack   |
 | Fail fast         | Return early on error, avoid deep nesting          |
+
+## Failure Taxonomy
+
+Use different mechanisms for different failure meanings:
+
+| Kind | Meaning | Mechanism |
+|------|---------|-----------|
+| Domain rejection | Expected business failure such as invalid transition or policy rejection | Return a typed or wrapped `error` |
+| Not found / conflict | Caller may handle or translate specially | Sentinel or custom `error` |
+| Infrastructure failure | DB, network, queue, filesystem, timeout | Return and wrap `error` |
+| Cancellation | Caller requested stop or deadline exceeded | Return `ctx.Err()` or wrap it |
+| Programmer bug / impossible state | Broken invariant after trusted validation, nil deref, unreachable branch | `panic` only if the process cannot continue safely |
+
+`panic` is not a substitute for domain or I/O error handling.
 
 ### Basic Error Handling
 
@@ -64,6 +79,7 @@ func fetchUser(ctx context.Context, id string) (*User, error) {
 | Internal helper | May return unwrapped |
 | Hiding implementation | `fmt.Errorf("operation failed: %v", err)` (%v not %w) |
 | Returning to public clients | Translate to fixed safe message/code (never raw `err.Error()`) |
+| Broken invariant in trusted code | Fix the model; panic only if continuing would corrupt state |
 
 ```go
 // ✅ Wrap at boundaries
@@ -394,9 +410,9 @@ func WithRetry[T any](ctx context.Context, cfg RetryConfig, fn func() (T, error)
 }
 
 func isRetryable(err error) bool {
-    // Network errors, timeouts are retryable
+    // Network timeouts and deadline issues are retryable.
     var netErr net.Error
-    if errors.As(err, &netErr) && netErr.Temporary() {
+    if errors.As(err, &netErr) && netErr.Timeout() {
         return true
     }
     if errors.Is(err, context.DeadlineExceeded) {
