@@ -368,17 +368,3 @@ go test -race ./...
 # Benchmark
 go test -bench=. -benchmem ./...
 ```
-
-## Kata Practice Areas
-
-Based on [go-kata](../../Go_Mastery/go_learn/go-kata) repository:
-
-1. **Context & Cancellation**: Fast-fail aggregator, graceful shutdown, leak-free scheduler
-2. **Runtime Observability**: runtime/metrics dashboards, metric-to-pprof incident drills
-3. **Memory Model & Sync**: happens-before reasoning, primitive selection under contention
-4. **database/sql Reliability**: pool tuning labs, timeout propagation, DB.Stats diagnosis
-5. **Performance**: Sharded locks, zero-allocation parsing, sync.Pool middleware
-6. **HTTP/Middleware**: Interface-based chains, client hygiene wrappers
-7. **Error Semantics**: Retry policies, defer cleanup chains, nil interface gotcha
-8. **Filesystems**: io/fs abstraction, embed.FS dev/prod switching
-9. **Testing**: Parallel subtests, table-driven, fuzzing harness

@@ -11,19 +11,19 @@ Use this skill to produce consistent, production-ready REST API designs and revi
 
 ## Workflow
 
-1. Clarify API scope.
+1. Clarify API scope.  
 Identify resource boundaries, actor roles, auth model, backward-compat constraints, and non-functional requirements.
 
-2. Define API contract first.
+2. Define API contract first.  
 Draft endpoint inventory and OpenAPI-first contract before implementation.
 
-3. Apply design rules by topic.
+3. Apply design rules by topic.  
 Use the reference matrix below and only load files relevant to the current task.
 
-4. Produce implementation-ready artifacts.
+4. Produce implementation-ready artifacts.  
 Deliver URI table, method semantics, request/response schemas, error model, pagination/filtering, and versioning strategy.
 
-5. Run compliance check.
+5. Run compliance check.  
 Validate against `references/review-checklist.md` before finalizing.
 
 ## Reference Matrix
@@ -45,19 +45,19 @@ Validate against `references/review-checklist.md` before finalizing.
 
 Always return concrete deliverables instead of abstract advice.
 
-1. Endpoint contract table.
+1. Endpoint contract table.  
 Include method, path, purpose, idempotency, request schema, response schema, error codes.
 
-2. Error model.
+2. Error model.  
 Use Problem JSON shape and define domain error types.
 
-3. Compatibility plan.
+3. Compatibility plan.  
 State whether change is backward compatible and show migration/versioning approach.
 
-4. Security controls.
+4. Security controls.  
 State authN/authZ model, rate limit policy, and sensitive data handling.
 
-5. Performance notes.
+5. Performance notes.  
 State pagination strategy, cacheability, and response size controls.
 
 ## Quick Search Hints
