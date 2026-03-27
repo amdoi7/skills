@@ -2,8 +2,11 @@
 
 ## Table of Contents
 
-- [Failure Taxonomy](#failure-taxonomy)
 - [Error Fundamentals](#error-fundamentals)
+- [Failure Taxonomy](#failure-taxonomy)
+- [Panic Policy](#panic-policy)
+- [Startup-Fatal Checks](#startup-fatal-checks)
+- [Error or Panic Quick Test](#error-or-panic-quick-test)
 - [Error Wrapping](#error-wrapping)
 - [Secure Error Handling](#secure-error-handling)
 - [Error Inspection](#error-inspection)
@@ -23,6 +26,10 @@
 | Handle or return  | Either handle a recoverable error or return it     |
 | Wrap with context | Add context when propagating errors up the stack   |
 | Fail fast         | Return early on error, avoid deep nesting          |
+| Panic honestly    | Panic only for bugs, broken invariants, and startup-fatal states |
+
+Normal failure should remain explicit and recoverable.
+Use `panic` only when the program has crossed into a state it was not designed to survive sanely.
 
 ## Failure Taxonomy
 
@@ -34,23 +41,106 @@ Use different mechanisms for different failure meanings:
 | Not found / conflict | Caller may handle or translate specially | Sentinel or custom `error` |
 | Infrastructure failure | DB, network, queue, filesystem, timeout | Return and wrap `error` |
 | Cancellation | Caller requested stop or deadline exceeded | Return `ctx.Err()` or wrap it |
-| Programmer bug / impossible state | Broken invariant after trusted validation, nil deref, unreachable branch | `panic` only if the process cannot continue safely |
+| Programmer bug / impossible state | Broken invariant after trusted validation, nil deref, unreachable branch | `panic` with a precise bug message |
+| Startup-fatal misconfiguration | Config, routing, or wiring makes the process unsafe to continue | Fail hard during startup via `panic` or fatal logging |
 
 `panic` is not a substitute for domain or I/O error handling.
+For normal failure, return `error`.
+For broken invariants, impossible states, corrupted trusted state, or startup that cannot continue sanely, failing hard is often cleaner and more honest than pushing a fake-recoverable `error` upward.
 
-### Basic Error Handling
+## Panic Policy
+
+Use `panic` deliberately, not nervously.
+
+### Return `error` when
+
+- the caller can retry, translate, or recover
+- the failure is part of normal business flow
+- I/O, network, database, timeout, or cancellation may happen in production
+- invalid external input arrived at a trust boundary
+
+### Panic when
+
+- an invariant that should already be guaranteed is false
+- trusted internal state is corrupted
+- a supposedly impossible branch is reached
+- startup wiring or configuration means the process cannot continue safely
+- continuing would only smear corruption or force every caller to treat a bug like routine control flow
+
+### Why this matters
+
+Bad error handling is often worse than no error handling. If an impossible state is wrapped in a polite-looking `error`, every caller now has to pretend that a bug is just another expected case. That makes the code noisier, less honest, and easier to misuse.
+
+A well-placed panic says something important: this is not business logic, this is a bug, a bad configuration, or a state the program was never designed to survive.
+
+### Good panic examples
 
 ```go
-// ✅ Check errors immediately
-result, err := doSomething()
-if err != nil {
-    return fmt.Errorf("do something: %w", err)
+func (bsm *blockStreamMerger) assertNoRows() {
+    if bsm.bd.rowsCount > 0 {
+        logger.Panicf("BUG: bsm.bd must be empty; got %d rows", bsm.bd.rowsCount)
+    }
+    if len(bsm.a.b) > 0 {
+        logger.Panicf("BUG: bsm.a must be empty; got %d bytes", len(bsm.a.b))
+    }
+    if len(bsm.rows.timestamps) > 0 {
+        logger.Panicf("BUG: bsm.rows must be empty; got %d rows", len(bsm.rows.timestamps))
+    }
+    if len(bsm.rowsTmp.timestamps) > 0 {
+        logger.Panicf("BUG: bsm.rowsTmp must be empty; got %d rows", len(bsm.rowsTmp.timestamps))
+    }
+    if bsm.uncompressedRowsSizeBytes != 0 {
+        logger.Panicf("BUG: bsm.uncompressedRowsSizeBytes must be 0; got %d", bsm.uncompressedRowsSizeBytes)
+    }
 }
-// Use result...
-
-// ❌ Don't ignore errors
-result, _ := doSomething()  // Bad: error ignored
 ```
+
+This is good because it protects a trusted internal invariant, does not pretend the caller can recover, and makes corruption obvious immediately.
+
+### Bad panic examples
+
+```go
+func ParseUserInput(raw string) UserID {
+    if raw == "" {
+        panic("empty user id") // bad: ordinary external input problem
+    }
+    return UserID(raw)
+}
+```
+
+```go
+func LoadProfile(ctx context.Context, id string) (*Profile, error) {
+    p, err := repo.Find(ctx, id)
+    if err != nil {
+        panic(err) // bad: normal I/O failure turned into process crash
+    }
+    return p, nil
+}
+```
+
+Use panic to expose lies in the program, not to avoid writing proper error semantics.
+
+## Startup-Fatal Checks
+
+Some failures are best rejected immediately during startup rather than converted into runtime uncertainty.
+
+Examples from the Go ecosystem:
+- `context.WithCancel(nil)` panics because nil parent context is never valid.
+- `http.ServeMux` panics on conflicting route registration because serving with ambiguous routing would be a broken startup state.
+- `sync.Once` re-panics the same panic value because initialization did not succeed and callers must not act as if it did.
+
+When startup assumptions are false, fail early with a direct message instead of limping forward.
+
+## Error or Panic Quick Test
+
+Ask:
+1. Can a sane caller recover from this here?
+2. Is this expected to happen in normal operation?
+3. Is the state already trusted and therefore this branch means a bug?
+4. If we continue, do we risk hiding corruption or spreading invalid state?
+
+If answers are `yes, yes, no, no` → return `error`.
+If answers are `no, no, yes, yes` → panic is likely the honest choice.
 
 ## Error Wrapping
 
@@ -218,9 +308,9 @@ if errors.As(err, &netErr) && netErr.Timeout() {
 
 ```go
 var (
-    ErrNameRequired        = errors.New("name required")
-    ErrEmailRequired       = errors.New("email required")
-    ErrInvalidEmailFormat  = errors.New("invalid email format")
+    ErrNameRequired       = errors.New("name required")
+    ErrEmailRequired      = errors.New("email required")
+    ErrInvalidEmailFormat = errors.New("invalid email format")
 )
 
 // Combine multiple errors
@@ -342,7 +432,7 @@ func (e *NotFoundError) Is(target error) bool {
 ```go
 type OperationError struct {
     Op  string
-    Err error  // Wrapped error
+    Err error // Wrapped error
 }
 
 func (e *OperationError) Error() string {
@@ -429,7 +519,7 @@ func isRetryable(err error) bool {
 ```go
 func process() error {
     fmt.Println("1")
-    defer fmt.Println("4")  // Last in, first out
+    defer fmt.Println("4") // Last in, first out
     fmt.Println("2")
     defer fmt.Println("3")
     return nil
@@ -491,7 +581,7 @@ func readConfig(path string) (config Config, err error) {
     }
     defer func() {
         if cerr := f.Close(); err == nil {
-            err = cerr  // Can modify err
+            err = cerr // Can modify err
         }
     }()
 
@@ -514,13 +604,13 @@ func (e *MyError) Error() string { return e.msg }
 // ❌ WRONG: Returns typed nil
 func getError() error {
     var err *MyError = nil
-    return err  // BUG: interface{type: *MyError, value: nil}
+    return err // BUG: interface{type: *MyError, value: nil}
 }
 
 func main() {
     err := getError()
     if err != nil {
-        fmt.Println("Error is NOT nil!")  // This prints!
+        fmt.Println("Error is NOT nil!") // This prints!
     }
 }
 ```
@@ -532,9 +622,9 @@ func main() {
 // nil interface = (nil, nil)
 // Typed nil    = (*MyError, nil) != (nil, nil)
 
-var err error = nil           // (nil, nil) - truly nil
+var err error = nil // (nil, nil) - truly nil
 var myErr *MyError = nil
-err = myErr                   // (*MyError, nil) - NOT nil!
+err = myErr         // (*MyError, nil) - NOT nil!
 ```
 
 ### The Solution
@@ -546,7 +636,7 @@ func getError() error {
     if err != nil {
         return err
     }
-    return nil  // Explicit untyped nil
+    return nil // Explicit untyped nil
 }
 
 // ✅ Or check before return
@@ -554,7 +644,7 @@ func maybeError(condition bool) error {
     if condition {
         return &MyError{msg: "something went wrong"}
     }
-    return nil  // Always return explicit nil
+    return nil // Always return explicit nil
 }
 
 // ✅ Use type switch for safety
@@ -566,7 +656,7 @@ func handleError(err error) {
     switch e := err.(type) {
     case *MyError:
         if e == nil {
-            return  // Handle typed nil case
+            return // Handle typed nil case
         }
         // Handle actual error
     default:

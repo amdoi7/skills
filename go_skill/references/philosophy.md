@@ -1,17 +1,20 @@
-# 设计哲学与危险信号
+# 设计哲学与危险信号 <!-- design-philosophy-and-red-flags -->
+
+> This reference is loaded as an **escalation path** from SKILL.md.
+> Prerequisite: you have already confirmed the problem is structural, not a local type/error/test issue.
 
 ## Table of Contents
 
-- [数据验证前移](#数据验证前移)
-- [Linus Torvalds: 好品味](#linus-torvalds-好品味)
-- [John Ousterhout: 复杂性管理](#john-ousterhout-复杂性管理)
-- [Google Code Review: 代码健康](#google-code-review-代码健康)
-- [危险信号清单](#危险信号清单)
-- [经典语录](#经典语录)
+- [数据验证前移 (Parse, Don't Validate)](#数据验证前移-parse-dont-validate)
+- [Linus Torvalds: 好品味 (Good Taste)](#linus-torvalds-好品味-good-taste)
+- [John Ousterhout: 复杂性管理 (Complexity Management)](#john-ousterhout-复杂性管理-complexity-management)
+- [Google Code Review: 代码健康 (Code Health)](#google-code-review-代码健康-code-health)
+- [危险信号清单 (Red Flags)](#危险信号清单-red-flags)
+- [经典语录 (Quotes)](#经典语录-quotes)
 
 ---
 
-## 数据验证前移
+## 数据验证前移 (Parse, Don't Validate)
 
 > "Parse, don't validate." — Alexis King
 >
@@ -33,20 +36,21 @@ Go 是基于数据结构的语言。**好的数据结构让错误状态无法表
 
 ### 原则
 
-| 原则 | 说明 |
-|------|------|
-| **边界验证一次** | 在系统入口处完成所有验证，内部代码信任上游 |
-| **解析而非验证** | 不要验证后丢弃信息，而是解析成强类型 |
-| **类型即文档** | 用类型系统表达约束，而非注释或运行时检查 |
-| **信任内部数据** | 一旦数据通过边界，内部函数不应重复验证 |
-| **Fail fast at boundary** | 边界层快速失败，暴露上游问题 |
+| 原则                        | 说明                    |
+| ------------------------- | --------------------- |
+| **边界验证一次**                | 在系统入口处完成所有验证，内部代码信任上游 |
+| **解析而非验证**                | 不要验证后丢弃信息，而是解析成强类型    |
+| **类型即文档**                 | 用类型系统表达约束，而非注释或运行时检查  |
+| **信任内部数据**                | 一旦数据通过边界，内部函数不应重复验证   |
+| **Fail fast at boundary** | 边界层快速失败，暴露上游问题        |
 
 ### 与领域建模配合
 
-- **先划上下文，再拆技术层**：优先按业务能力或限界上下文拆包，而不是先建 `handler/service/repo` 总目录。
-- **名称先表达业务**：包名、类型名、方法名优先表达订单、计费、库存等概念，而不是 transport/storage 细节。
+- **先修局部数据模型，再决定是否需要改结构**：优先消除 stringly typed 参数、重复验证、error 语义混乱；不要一上来重画包树。
+- **名称先在当前作用域表达职责**：先让包内类型名、方法名、变量名准确表达责任；不要默认扩展成整仓库命名整理。
 - **允许领域依赖，隔离技术依赖**：订单依赖客户额度是正常业务事实；DB 表结构、HTTP DTO、框架对象才应该被隔离在边界。
 - **不变式内建，策略外置**：对象成立所必需的约束放进类型和构造；可变运营规则交给显式策略或应用层编排。
+- **只有当结构性症状持续存在时才升级**：例如重复 DTO churn、pass-through 层、跨包 ownership 混乱、测试 seam 很不自然。
 
 ### Go 实践示例
 
@@ -200,25 +204,25 @@ func ParseOrderStatus(s string) (OrderStatus, error) {
 | `float64` 表示金额 | 精度丢失，无约束 | `Money{cents int64}` |
 | 机械地让内部辅助函数返回 error | 把已被边界/类型消除的失败继续暴露给调用方 | 对可恢复失败返回 error；对已保证成立的不变式直接假设有效；仅对程序员 bug 或真正不可能状态 panic |
 | 验证后仍用原始类型 | 验证信息丢失 | 解析成强类型 |
-| `handler/service/repo` 成为主包结构 | 技术结构淹没业务概念 | 先按业务能力/上下文拆包，再在内部安放技术适配 |
+| `handler/service/repo` 成为主包结构 | 技术结构淹没业务概念 | 只有当这真的是复杂度来源时，才按业务能力重组；否则先在现有包内消除重复与 pass-through |
 
 ---
 
-## Linus Torvalds: 好品味
+## Linus Torvalds: 好品味 (Good Taste)
 
 > "Sometimes you can see a problem in a different way and rewrite it so that the special case goes away and becomes the normal case."
 
 ### 核心原则
 
-| 原则 | 说明 |
-|------|------|
-| **消除特殊情况** | 边界情况应该通过设计消除，而不是通过条件判断处理 |
-| **数据结构优先** | 好程序员担心数据结构，糟糕程序员担心代码 |
-| **嵌套限制** | 超过 3 层嵌套说明代码需要重构 |
-| **函数短小** | 函数应该短小精悍，只做一件事 |
-| **局部变量限制** | 局部变量不应超过 5-10 个，否则需要拆分函数 |
-| **Never break userspace** | 用户可见行为不变是神圣不可侵犯的铁律 |
-| **快速暴露问题** | 不要写 fallback/兼容/回退代码，让上游数据问题在测试中暴露 |
+| 原则                        | 说明                                 |
+| ------------------------- | ---------------------------------- |
+| **消除特殊情况**                | 边界情况应该通过设计消除，而不是通过条件判断处理           |
+| **数据结构优先**                | 好程序员担心数据结构，糟糕程序员担心代码               |
+| **嵌套限制**                  | 超过 3 层嵌套说明代码需要重构                   |
+| **函数短小**                  | 函数应该短小精悍，只做一件事                     |
+| **局部变量限制**                | 局部变量不应超过 5-10 个，否则需要拆分函数           |
+| **Never break userspace** | 用户可见行为不变是神圣不可侵犯的铁律                 |
+| **快速暴露问题**                | 不要写 fallback/兼容/回退代码，让上游数据问题在测试中暴露 |
 
 ### Go 实践示例
 
@@ -288,7 +292,7 @@ func process(data *Data) error {
 
 ---
 
-## John Ousterhout: 复杂性管理
+## John Ousterhout: 复杂性管理 (Complexity Management)
 
 > "Complexity is anything related to the structure of a software system that makes it hard to understand and modify."
 
@@ -381,7 +385,7 @@ func GetOrCreateUser(id string, defaults User) *User {
 
 ---
 
-## Google Code Review: 代码健康
+## Google Code Review: 代码健康 (Code Health)
 
 > "A CL that improves the overall code health of the system should not be delayed for perfection."
 
@@ -406,7 +410,7 @@ func GetOrCreateUser(id string, defaults User) *User {
 
 ---
 
-## 危险信号清单
+## 危险信号清单 (Red Flags)
 
 ### Ousterhout 14 条危险信号
 
@@ -446,7 +450,7 @@ func GetOrCreateUser(id string, defaults User) *User {
 
 ---
 
-## 经典语录
+## 经典语录 (Quotes)
 
 ### Linus Torvalds
 
