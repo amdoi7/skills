@@ -18,7 +18,7 @@ commit
 
 ## What `ddd-skill` is for
 
-[[01_Area/Vibe_Coding/skills/ddd-skill/SKILL.md|ddd-skill]] 负责把稳定业务切片或既有模块边界问题，转成可交接的 DDD 工作流工件。
+[[ddd-skill/SKILL.md|ddd-skill]] 负责把稳定业务切片或既有模块边界问题，转成可交接的 DDD 工作流工件。
 
 它最适合回答：
 - 这个规则应该归谁？
@@ -43,7 +43,7 @@ commit
 
 ## Downstream / adjacent skills
 
-### [[01_Area/Vibe_Coding/skills/restful-api-design/SKILL.md|restful-api-design]]
+### [[restful-api-design/SKILL.md|restful-api-design]]
 
 当领域边界和语言已经基本稳定，接下来要把它落成：
 - endpoint inventory
@@ -53,7 +53,7 @@ commit
 
 这时应从 `ddd-skill` handoff 到 API contract 设计，而不是继续在 DDD 文档里写 HTTP 细节。
 
-### [[01_Area/Vibe_Coding/skills/go_skill/SKILL.md|idiomatic-go]] / [[01_Area/Vibe_Coding/skills/python_skill/SKILL.md|modern-python]]
+### [[idiomatic-go/SKILL.md|idiomatic-go]] / [[modern-python/SKILL.md|modern-python]]
 
 当主要问题变成：
 - 包 / 模块怎么落
@@ -63,7 +63,7 @@ commit
 
 就应该继承 `ddd-skill` 的边界结论，转到语言特定 skill。
 
-### [[01_Area/Vibe_Coding/skills/commit/SKILL.md|commit]]
+### [[commit/SKILL.md|commit]]
 
 当设计和实现都已经完成，需要：
 - 收敛 diff
@@ -78,11 +78,11 @@ commit
 | If the user mainly needs... | Use this skill |
 | --- | --- |
 | 上游 spec 仍然很宽、切片还不稳定 | upstream split / readiness first |
-| 业务边界、规则归属、上下文协作、legacy boundary review | [[01_Area/Vibe_Coding/skills/ddd-skill/SKILL.md|ddd-skill]] |
-| REST endpoints / OpenAPI / Problem JSON / HTTP semantics | [[01_Area/Vibe_Coding/skills/restful-api-design/SKILL.md|restful-api-design]] |
-| Go 代码结构、包边界、并发与接口设计 | [[01_Area/Vibe_Coding/skills/go_skill/SKILL.md|idiomatic-go]] |
-| Python 代码结构、模块边界、异常与 async 设计 | [[01_Area/Vibe_Coding/skills/python_skill/SKILL.md|modern-python]] |
-| Commit / PR packaging | [[01_Area/Vibe_Coding/skills/commit/SKILL.md|commit]] |
+| 业务边界、规则归属、上下文协作、legacy boundary review | [[ddd-skill/SKILL.md|ddd-skill]] |
+| REST endpoints / OpenAPI / Problem JSON / HTTP semantics | [[restful-api-design/SKILL.md|restful-api-design]] |
+| Go 代码结构、包边界、并发与接口设计 | [[idiomatic-go/SKILL.md|idiomatic-go]] |
+| Python 代码结构、模块边界、异常与 async 设计 | [[modern-python/SKILL.md|modern-python]] |
+| Commit / PR packaging | [[commit/SKILL.md|commit]] |
 
 ## Productization notes
 

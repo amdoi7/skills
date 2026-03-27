@@ -17,8 +17,8 @@ Improve concrete Go code. Do not jump to module catalogs or package-tree redesig
 ## Scope
 
 - Starts once the capability boundary is mostly known; the question is how to express it cleanly in Go.
-- Route upstream boundary / bounded-context work to [[01_Area/Vibe_Coding/skills/ddd-skill/SKILL.md|ddd-skill]].
-- Route HTTP contract / OpenAPI work to [[01_Area/Vibe_Coding/skills/restful-api-design/SKILL.md|restful-api-design]].
+- Route upstream boundary / bounded-context work to [[ddd-skill/SKILL.md|ddd-skill]].
+- Route HTTP contract / OpenAPI work to [[restful-api-design/SKILL.md|restful-api-design]].
 - If the current project has a `CLAUDE.md` with framework conventions (Uber FX, Ent ORM, etc.), those project-level patterns take precedence over this skill's general guidance.
 
 ## Escalation Policy

@@ -24,9 +24,9 @@
 
 当 `scope_paths` 指向特定类型内容时，优先复用相邻 skill 的 checklist：
 
-- Python 代码：`Vibe_Coding/skills/python_skill/references/review-checklist.md`
-- REST/API 设计：`Vibe_Coding/skills/restful-api-design/references/review-checklist.md`
-- Go 设计与代码健康：`Vibe_Coding/skills/go_skill/references/philosophy.md`
+- Python 代码：`modern-python/references/review-checklist.md`
+- REST/API 设计：`restful-api-design/references/review-checklist.md`
+- Go 设计与代码健康：`idiomatic-go/references/philosophy.md`
 
 当前 skill 自己更关注**提交边界、文档结构、流程轻重**，不要重新发明一整套语言级 review 规则。
 
