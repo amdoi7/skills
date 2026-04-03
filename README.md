@@ -82,6 +82,8 @@ commit
 | REST endpoints / OpenAPI / Problem JSON / HTTP semantics | [[restful-api-design/SKILL.md|restful-api-design]] |
 | Go 代码结构、包边界、并发与接口设计 | [[idiomatic-go/SKILL.md|idiomatic-go]] |
 | Python 代码结构、模块边界、异常与 async 设计 | [[modern-python/SKILL.md|modern-python]] |
+| 散文/文档/笔记写作与审查，去除 AI 腔调 | [[human-prose/SKILL.md|human-prose]] |
+| ASCII/Unicode 纯文本图 | [[ascii-diagram/SKILL.md|ascii-diagram]] |
 | Commit / PR packaging | [[commit/SKILL.md|commit]] |
 
 ## Productization notes
