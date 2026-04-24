@@ -35,8 +35,17 @@ Ask these questions when reviewing Python code:
 - [ ] Are type hints present and correct?
 - [ ] Is `is` vs `==` used correctly?
 - [ ] No mutable default arguments?
-- [ ] F-strings avoided in logging?
-- [ ] Using stdlib before external deps?
+- [ ] Does logging use the deferred formatting style that matches the chosen logger, such as `loguru` braces or stdlib `%s` formatting?
+- [ ] Are external dependencies justified and consistent with repository conventions?
+
+### Docs, Public Surface & Release
+
+- [ ] Does the README or top-level doc show the shortest runnable path?
+- [ ] Is the public entry path small and obvious for common usage?
+- [ ] Are `examples/` and `tests/` serving different jobs?
+- [ ] If sync and async APIs are both public, are naming and behavior aligned?
+- [ ] Is there a smallest release gate for the promises this change affects?
+- [ ] Does CI cover the support matrix this code or docs claim?
 
 ## Code Smells & Refactoring
 

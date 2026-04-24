@@ -1,5 +1,14 @@
 # Error Handling: Semantics, Wrapping & Edge Cases
 
+## Best Practices Summary
+
+- Return `error` for ordinary failure and reserve `panic` for broken invariants
+- Wrap errors with useful context and preserve chains when callers should inspect them
+- Log an error or return it at a layer, not both
+- Use sentinel errors for stable conditions and custom types for rich context
+- Keep public error output safe and low-cardinality
+- Make retry and cleanup semantics explicit
+
 ## Table of Contents
 
 - [Error Fundamentals](#error-fundamentals)
@@ -304,7 +313,7 @@ if errors.As(err, &netErr) && netErr.Timeout() {
 }
 ```
 
-### errors.Join (Go 1.20+)
+### errors.Join
 
 ```go
 var (

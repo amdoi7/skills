@@ -154,6 +154,14 @@ def dispatch_bad(action, data):
         raise ValueError(f"Unknown action: {action}")
 ```
 
+## Public Entry Paths and Documentation
+
+- Design the shortest runnable path first. If the quickstart feels awkward, the public surface is probably wrong.
+- Export a small stable set of common entry points from the package boundary.
+- Keep deeper control explicit through config objects, builders, or advanced constructors.
+- Keep README and examples aligned with behavior the project actually supports.
+- Keep one source of truth for detailed guidance. Do not repeat the same procedure across SKILL.md, README, and reference docs.
+
 ## Rob Pike's 5 Rules
 
 1. **Measure first**: Bottlenecks are unpredictable; profile before optimizing

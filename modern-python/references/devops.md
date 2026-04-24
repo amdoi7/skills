@@ -228,29 +228,42 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
+## Release Gate and Compatibility Matrix
+
+- Define a smallest release gate: the few commands or flows that would block a release if they broke.
+- Keep the release gate smaller than the full suite. It should be fast enough to trust and stable enough to keep.
+- Separate fast CI baseline from slower or environment-heavy validation.
+- Build the compatibility matrix from actual support promises, not aspirational combinations.
+- If sync and async APIs are both public, run both in CI before claiming parity.
+
+```yaml
+strategy:
+  matrix:
+    python-version: ["3.11", "3.12"]  # replace with supported versions
+    os: [ubuntu-latest]
+```
+
 ## Observability
 
-### Structured Logging
+### Logging Conventions
+
+Prefer `loguru` for application logging unless the repository has already standardized another logger. Keep sinks, formats, and field names consistent across services and jobs.
 
 ```python
 from loguru import logger
+import os
 import sys
 
-def setup_logging():
+
+def setup_logging() -> None:
     logger.remove()
 
-    # JSON format for production
     if os.getenv("ENV") == "production":
-        logger.add(
-            sys.stdout,
-            format="{message}",
-            serialize=True,  # JSON output
-        )
+        logger.add(sys.stdout, format="{message}", serialize=True)
     else:
-        logger.add(
-            sys.stderr,
-            format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>",
-        )
+        logger.add(sys.stderr)
+
+logger.info("service started")
 ```
 
 ### Health Checks

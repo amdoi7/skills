@@ -278,6 +278,19 @@ class RateLimiter:
                 self.tokens -= 1
 ```
 
+## Designing Sync and Async Facades
+
+- Keep one conceptual API, not two unrelated products.
+- Match names, argument order, return semantics, and error meaning where possible.
+- Only diverge when Python semantics force it, such as `await`, async iteration, or context-manager protocol differences.
+- Centralize core behavior in one implementation path instead of letting sync and async logic drift apart.
+- Mirror tests across both surfaces and run both in CI if both are public.
+
+```python
+user = fetch_user(user_id)
+user = await fetch_user_async(user_id)
+```
+
 ## Pitfalls (常见陷阱)
 
 ### 1. 忘记 await

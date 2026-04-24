@@ -1,5 +1,14 @@
 # Context, Cancellation & Concurrency
 
+## Best Practices Summary
+
+- Pass `ctx` as the first parameter and propagate it through the whole call path
+- Never store `context.Context` in a struct
+- Use cancellation-aware sends, receives, and goroutines to avoid leaks
+- Prefer `errgroup` when sibling goroutines share fate
+- Make worker-pool cancellation semantics explicit
+- Keep context values narrow and request-scoped
+
 ## Table of Contents
 
 - [Context Fundamentals](#context-fundamentals)
@@ -125,7 +134,6 @@ func fetchAll(ctx context.Context, urls []string) ([][]byte, error) {
     results := make([][]byte, len(urls))
 
     for i, url := range urls {
-        i, url := i, url  // Capture (Go < 1.22)
         g.Go(func() error {
             data, err := fetchWithContext(ctx, url)
             if err != nil {
@@ -151,7 +159,6 @@ func processItems(ctx context.Context, items []Item) error {
     g.SetLimit(10)  // Max 10 concurrent goroutines
 
     for _, item := range items {
-        item := item
         g.Go(func() error {
             return processItem(ctx, item)
         })
@@ -169,7 +176,6 @@ func processWithLimit(ctx context.Context, items []Item, limit int) error {
 
     g, ctx := errgroup.WithContext(ctx)
     for _, item := range items {
-        item := item
         g.Go(func() error {
             select {
             case sem <- struct{}{}:
@@ -221,7 +227,7 @@ func workerPool(ctx context.Context, jobs <-chan Job, results chan<- Result, wor
 }
 ```
 
-### Worker Pool with errors.Join (Go 1.20+)
+### Worker Pool with errors.Join
 
 Be explicit about cancellation semantics. Two common models:
 
@@ -327,7 +333,7 @@ func getData(key string) (interface{}, error) {
         return expensiveFetch(key)
     })
     if shared {
-        log.Printf("Result was shared with other callers")
+        slog.Info("singleflight result shared", "key", key)
     }
     return v, err
 }

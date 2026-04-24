@@ -1,86 +1,194 @@
 ---
 name: idiomatic-go
 description: >
-  Idiomatic Go guidance for modeling domain types clearly, keeping package
-  boundaries simple, and writing safe concurrent code. Use when writing,
-  fixing, or reviewing Go code — tightening types, error semantics, context
-  propagation, concurrency ownership, or tests. Do NOT use for upstream
-  domain decomposition (route to ddd-skill), REST contract design (route to
-  restful-api-design), or broad package taxonomy unless the user explicitly
-  asks to redesign modules or services.
+  Use for Go code work: implementing, debugging, refactoring, or reviewing types, interfaces, error semantics, context propagation, goroutine ownership, synchronization, package boundaries, tests, benchmarks, and explicit Go repo bootstrap.
 ---
 
-# Idiomatic Go — Implementation First
+# Idiomatic Go
 
-Improve concrete Go code. Do not jump to module catalogs or package-tree redesign.
+Use this skill to keep Go work local, explicit, and easy to verify.
 
-## Scope
+## When to Use
 
-- Starts once the capability boundary is mostly known; the question is how to express it cleanly in Go.
-- Route upstream boundary / bounded-context work to [[ddd-skill/SKILL.md|ddd-skill]].
-- Route HTTP contract / OpenAPI work to [[restful-api-design/SKILL.md|restful-api-design]].
-- If the current project has a `CLAUDE.md` with framework conventions (Uber FX, Ent ORM, etc.), those project-level patterns take precedence over this skill's general guidance.
+- Writing, fixing, reviewing, or debugging concrete Go code
+- Tightening types, interfaces, naming, error semantics, or cancellation flow
+- Clarifying goroutine ownership, synchronization, or testability
+- Reviewing package design only after a concrete structural symptom appears
+- Bootstrapping a Go repo or service only when the user explicitly asks
 
-## Escalation Policy
+## When Not to Use
 
-**Default**: stay inside the current function → file → package. Prefer local improvements.
+- Upstream domain decomposition before the capability boundary is known
+- Pure OpenAPI or HTTP contract design without implementation pressure
+- Non-Go tasks
+- Framework-level repo rules that are already defined by project docs
 
-**Escalate to structure work only when**:
-- the user explicitly asks to split a package, module, or service
-- duplicated rules or DTO churn span multiple packages
-- pass-through layers dominate the call path and add no abstraction
-- one behavior requires booting half the system to test
-- state / invariant / concurrency ownership is unclear across package boundaries
+If the current project has a `CLAUDE.md` or other local engineering guide, follow that first and use this skill as the Go-specific layer underneath it.
 
-If structure is wrong, name the concrete symptom first, then propose the smallest change that fixes it.
+## Defaults
+
+- Prefer the smallest change inside the current function → file → package
+- Load only the reference files the task actually needs
+- Name the concrete symptom before proposing a structural rewrite
+- Prefer strong types and explicit control flow over clever helpers
+- Treat tests as behavior constraints, not coverage decoration
+
+## Local-First Routing
+
+- Stay in the current function, file, or package before proposing package or layout changes.
+- Load only the reference that matches the named symptom.
+- Verify with the narrowest command that proves the change.
+- Escalate to structure only when a concrete symptom crosses a local boundary.
+
+## Modes
+
+### Implementation Mode
+
+Default mode. Make the smallest code change that fixes the concrete problem.
+
+### Review Mode
+
+Focus on observable risk:
+- incorrect type or interface boundaries
+- unclear error semantics
+- unsafe concurrency ownership
+- brittle or implementation-coupled tests
+- unnecessary package churn
+
+### Audit Mode
+
+Use for codebase sweeps. Audit one concern at a time:
+- boundary leaks and weak types
+- error or logging misuse
+- context and goroutine ownership
+- brittle tests and weak verification
+- pass-through layers and structural smells
+
+Group findings by category, then propose the smallest repeated fix.
+
+### Debug Mode
+
+Reproduce first, narrow the failing path, then load only the references for the failing concern.
+
+### Design-Escalation Mode
+
+Use only when the problem is clearly structural: duplicated rules across packages, pass-through layers, unclear ownership, or tests that require booting half the system.
+
+### Bootstrap Mode
+
+Use only when the user explicitly asks to initialize a Go repo, scaffold a service, or review project layout. Right-size the structure; do not import a heavyweight architecture by reflex.
 
 ## Decision Order
 
-1. Identify scope: function, file, package, service, or cross-package.
-2. If local, stay local.
-3. Clarify data shape with small strong types.
-4. Make error meaning and cancellation explicit.
-5. Route failure: recoverable → `error`; broken invariant → `panic`.
-6. Make concurrency ownership obvious and testable.
-7. Improve tests around public behavior.
-8. Only then consider structural redesign, with evidence.
+1. Identify scope: function, file, package, repo bootstrap, or structural redesign.
+2. If the issue is local, stay local.
+3. Identify the primary concern and load only the matching references.
+4. Clarify data shape, names, and boundary types.
+5. Make error meaning, cancellation, and ownership explicit.
+6. Strengthen tests around public behavior and failure paths.
+7. Escalate to package or repo design only if the symptom is structural.
+
+## Core Go Rules
+
+- `ctx context.Context` is the first parameter. Do not store context in a struct.
+- Define interfaces where they are consumed. Accept interfaces, return structs.
+- Do not create interfaces before a real second use or a concrete test seam.
+- Keep the zero value useful when possible.
+- Return `error` for ordinary failure. Use `panic` only for broken invariants or startup-fatal states.
+- Log an error or return it at a layer, not both.
+- Prefer behavior-focused tests over implementation-detail tests.
+- Prefer specific domain types over stringly typed parameters.
+
+## Workflow
+
+1. Determine the primary task.
+2. Read only the matching references.
+3. Make the smallest change that fixes the named symptom.
+4. Verify with the narrowest commands that prove the change.
+5. Escalate only if the evidence says the structure is wrong.
 
 ## Reference Loading Rules
 
-Load **only** the references the task needs. Use the keyword table to decide.
+- Choose one primary concern before reading references.
+- For large references, read the table of contents first, then only the needed heading or file slice.
+- In `testing.md`, choose the relevant slice: fundamentals, table tests, parallel/subtests, fuzzing, mocks, fixtures, benchmarks, or leak checks.
+- In `error-handling.md`, choose the relevant slice: taxonomy, panic policy, wrapping, inspection, sentinel/custom errors, retry, cleanup, or nil interface traps.
+- In `context-cancellation.md`, choose the relevant slice: context rules, cancellation sends, timeouts, errgroup, worker pools, singleflight, shutdown, or leak detection.
+- If the concern is still unclear, inspect the failing code or reproduction before loading multiple long references.
 
-| If the task mentions… | Load |
-| --- | --- |
-| error, wrap, sentinel, retry, panic, recover | [error-handling.md](references/error-handling.md) |
-| test, mock, fuzz, table-driven, coverage, assert | [testing.md](references/testing.md) |
-| goroutine, channel, context, cancel, timeout, deadline, errgroup | [context-cancellation.md](references/context-cancellation.md) |
-| mutex, atomic, race, sync, happens-before, once | [memory-model-sync.md](references/memory-model-sync.md) |
-| handler, middleware, HTTP client, CORS, rate limit, server | [http-middleware.md](references/http-middleware.md) |
-| pool, connection, sql.DB, transaction, DSN | [database-sql-pooling-timeouts.md](references/database-sql-pooling-timeouts.md) |
-| pprof, GC, scheduler, metrics, memory leak, runtime | [runtime-observability.md](references/runtime-observability.md) |
-| allocation, benchmark, throughput, sync.Pool, escape | [performance.md](references/performance.md) |
-| embed, fs, config file, build tag, cross-compile | [filesystems.md](references/filesystems.md) |
-| package split, module redesign, architecture review, deep module | [philosophy.md](references/philosophy.md) — escalation path, not default |
+## Quick Reference
+
+| Topic | Use When | Reference |
+| --- | --- | --- |
+| Naming | packages, constructors, acronyms, boolean names, stuttering | [references/naming.md](references/naming.md) |
+| Structs & Interfaces | interface placement, receiver choice, embedding, zero value, compile-time checks | [references/structs-interfaces.md](references/structs-interfaces.md) |
+| Error Handling | wrapping, sentinel errors, `errors.Is/As`, panic routing, retries | [references/error-handling.md](references/error-handling.md) |
+| Context & Cancellation | `context.Context`, timeouts, errgroup, goroutine lifetime | [references/context-cancellation.md](references/context-cancellation.md) |
+| Safety | nil traps, `append` aliasing, defensive copies, conversion hazards, defer-in-loop | [references/safety.md](references/safety.md) |
+| Testing | table-driven tests, race detection, fuzzing, mocks, examples | [references/testing.md](references/testing.md) |
+| Synchronization | mutex, atomic, happens-before, ownership of shared state | [references/memory-model-sync.md](references/memory-model-sync.md) |
+| HTTP | handlers, clients, middleware, timeouts, request boundaries | [references/http-middleware.md](references/http-middleware.md) |
+| Database | `sql.DB`, pool sizing, transactions, deadlines, DSN concerns | [references/database-sql-pooling-timeouts.md](references/database-sql-pooling-timeouts.md) |
+| Runtime & Observability | pprof, scheduler, metrics, leak investigation, tracing signals | [references/runtime-observability.md](references/runtime-observability.md) |
+| Performance | benchmarks, allocations, escape analysis, `sync.Pool` | [references/performance.md](references/performance.md) |
+| Filesystems & Build | `embed`, `fs`, config files, build tags, cross-compilation | [references/filesystems.md](references/filesystems.md) |
+| Linters & Static Checks | `golangci-lint`, `govet`, `staticcheck`, `revive`, `errname`, `nolint` | [references/linters.md](references/linters.md) |
+| Project Bootstrap | `go mod init`, repo scaffold, CLI/service layout, essential files | [references/project-bootstrap.md](references/project-bootstrap.md) |
+| Structural Router | package split, deep modules, DTO churn, pass-through layers | [references/philosophy.md](references/philosophy.md) |
+| Boundary Modeling | parse-don't-validate, DTO vs domain, trusted internal data | [references/philosophy-boundaries.md](references/philosophy-boundaries.md) |
+| Good Taste | special cases, nesting, awkward local control flow | [references/philosophy-good-taste.md](references/philosophy-good-taste.md) |
+| Complexity | deep modules, information hiding, change amplification | [references/philosophy-complexity.md](references/philosophy-complexity.md) |
+| Design Review | structural review order, red flags, small CLs | [references/philosophy-review.md](references/philosophy-review.md) |
 
 ## Panic vs Error Routing
 
 | Situation | Choice | Why |
 | --- | --- | --- |
-| HTTP handler gets invalid JSON / bad params | `error` → 4xx | External input is untrusted |
-| Repository returns timeout / connection error | `error` | I/O failure is recoverable |
+| Invalid external input at handler or CLI boundary | `error` | External input is untrusted |
+| Timeout, DB error, network failure, cancellation | `error` | Operational failure is recoverable or translatable |
 | Business rule rejects a transition | `error` | Domain logic, not corruption |
-| Internal assert finds trusted state corrupted | `panic` | Broken invariant, not ordinary failure |
-| Startup route registration conflicts | `panic` / fatal exit | Miswired before serving traffic |
-| Nil parent context in `WithCancel`-style call | `panic` | Fundamental precondition violated |
+| Trusted internal invariant is broken | `panic` | The program is in a lying state |
+| Startup wiring or route registration is invalid | `panic` / fatal exit | Serving traffic would be broken from the start |
+| Nil parent context in `WithCancel`-style code | `panic` | Fundamental precondition violated |
 
-Ordinary failure → `error`. Broken assumption → fail hard.
+Ordinary failure should stay explicit. Broken assumptions should fail hard.
+
+## Review Output Contract
+
+For review tasks, report in this order:
+
+1. `Finding` — what is wrong
+2. `Why it matters` — behavior, correctness, maintenance, or operability impact
+3. `Minimal change` — the smallest fix that removes the risk
+4. `Validation` — how to prove the fix
+
+## Trigger Eval Prompts
+
+Use these prompts when tuning routing or checking neighboring skill competition.
+
+Should trigger:
+
+- Review this Go code for context leaks and goroutine ownership.
+- Fix Go error wrapping around repository calls so callers can use `errors.Is`.
+- Refactor these Go interfaces; mocks are driving awkward package boundaries.
+- Add behavior tests and a race check for worker-pool cancellation.
+
+Should stay quiet:
+
+- Rewrite this README to sound less AI.
+- Design OpenAPI endpoints and Problem JSON for orders.
+- Split this domain into bounded contexts before choosing language.
+- Commit these changes as two Conventional Commits.
+- Explain CPython GIL internals.
+- Draw an ASCII architecture diagram.
 
 ## Tooling
 
 ```bash
-gofmt -w .              # format
-goimports -w .          # imports
-golangci-lint run       # lint
-go test -race ./...     # race detection
-go test -bench=. -benchmem ./...  # benchmark
+gofmt -w .
+goimports -w .
+golangci-lint run
+go test ./...
+go test -race ./...
+go test -bench=. -benchmem ./...
 ```

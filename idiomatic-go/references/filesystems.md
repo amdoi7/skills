@@ -338,7 +338,7 @@ go build -ldflags "-X main.version=1.0.0 \
 
 ```dockerfile
 # Build stage
-FROM golang:1.22-alpine AS builder
+FROM golang:1.24-alpine AS builder
 WORKDIR /app
 
 # Cache dependencies

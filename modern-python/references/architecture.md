@@ -126,6 +126,24 @@ def get_place_order(db: AsyncSession = Depends(get_db)) -> PlaceOrder:
 - Add an interface when it isolates another context, storage mechanism, or external system.
 - Testing convenience alone is not enough reason to add a new abstraction layer if a fake concrete object would be simpler.
 
+## Public Facade and Escape Hatch
+
+Give users a short common path first, then expose deeper control explicitly.
+
+- Export a small stable set of high-frequency entry points from the package boundary.
+- Keep advanced control behind config objects, builders, or explicit constructors.
+- Do not make users import from internal modules for common tasks.
+- Treat the quickstart path as an API test: if the shortest runnable example is awkward, the public surface probably needs work.
+
+```python
+from payments import connect, ClientConfig
+
+client = connect()
+
+config = ClientConfig(timeout=5, retries=2)
+client = connect(config)
+```
+
 ## Error Taxonomy
 
 Use a single hierarchy across the skill:
@@ -162,20 +180,16 @@ class InfrastructureError(AppError):
 
 ## Logging Strategy
 
+Prefer `loguru` for application logging unless the repository has already standardized another logger. Keep one logging stack across entry points, jobs, and workers.
+
 ```python
 from loguru import logger
 import sys
 
-# Configure once at startup
-def setup_logging(level: str = "INFO"):
-    logger.remove()
-    logger.add(
-        sys.stderr,
-        level=level,
-        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan> | <level>{message}</level>",
-    )
 
-# Usage in code
-logger.info("Processing order {}", order_id)
-logger.bind(user_id=user_id, action="login").info("User logged in")
+def setup_logging(level: str = "INFO") -> None:
+    logger.remove()
+    logger.add(sys.stderr, level=level)
+
+logger.info("processing order {}", order_id)
 ```

@@ -1,5 +1,14 @@
 # HTTP & Middleware Engineering
 
+## Best Practices Summary
+
+- Keep middleware signatures simple and composable
+- Log requests with `log/slog` fields rather than formatted strings
+- Capture response status explicitly when logging handlers
+- Reuse `http.Client` instances and set timeouts intentionally
+- Keep request-scoped data in context only when it is truly request-scoped
+- Translate internal errors to stable public responses at the boundary
+
 ## Table of Contents
 
 - [Middleware Fundamentals](#middleware-fundamentals)
@@ -19,10 +28,16 @@ type Middleware func(http.Handler) http.Handler
 
 // Usage
 func loggingMiddleware(next http.Handler) http.Handler {
+    logger := slog.Default()
+
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         start := time.Now()
         next.ServeHTTP(w, r)
-        log.Printf("%s %s %v", r.Method, r.URL.Path, time.Since(start))
+        logger.Info("request complete",
+            "method", r.Method,
+            "path", r.URL.Path,
+            "duration", time.Since(start),
+        )
     })
 }
 ```
@@ -84,7 +99,8 @@ func (c *Chain) Append(mws ...Middleware) *Chain {
 }
 
 // Usage
-baseChain := NewChain(loggingMiddleware, recoveryMiddleware)
+logger := slog.Default()
+baseChain := NewChain(LoggingMiddleware(logger), RecoveryMiddleware(logger))
 authChain := baseChain.Append(authMiddleware)
 
 mux := http.NewServeMux()
@@ -97,7 +113,7 @@ mux.Handle("/private", authChain.ThenFunc(privateHandler))
 ### Logging Middleware
 
 ```go
-func LoggingMiddleware(logger *log.Logger) Middleware {
+func LoggingMiddleware(logger *slog.Logger) Middleware {
     return func(next http.Handler) http.Handler {
         return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
             start := time.Now()
@@ -107,12 +123,11 @@ func LoggingMiddleware(logger *log.Logger) Middleware {
 
             next.ServeHTTP(wrapped, r)
 
-            logger.Printf(
-                "%s %s %d %v",
-                r.Method,
-                r.URL.Path,
-                wrapped.status,
-                time.Since(start),
+            logger.Info("http request",
+                "method", r.Method,
+                "path", r.URL.Path,
+                "status", wrapped.status,
+                "duration", time.Since(start),
             )
         })
     }
@@ -132,12 +147,17 @@ func (rw *responseWriter) WriteHeader(code int) {
 ### Recovery Middleware
 
 ```go
-func RecoveryMiddleware(logger *log.Logger) Middleware {
+func RecoveryMiddleware(logger *slog.Logger) Middleware {
     return func(next http.Handler) http.Handler {
         return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
             defer func() {
                 if err := recover(); err != nil {
-                    logger.Printf("panic: %v\n%s", err, debug.Stack())
+                    logger.Error("panic in handler",
+                        "panic", err,
+                        "method", r.Method,
+                        "path", r.URL.Path,
+                        "stack", string(debug.Stack()),
+                    )
                     http.Error(w, "Internal Server Error", http.StatusInternalServerError)
                 }
             }()
@@ -436,7 +456,7 @@ func handleError(w http.ResponseWriter, err error) {
         return
     }
 
-    log.Printf("unhandled error: %v", err)
+    slog.Error("unhandled handler error", "error", err)
     writeError(w, http.StatusInternalServerError, APIError{
         Code:    "INTERNAL_ERROR",
         Message: "An unexpected error occurred",

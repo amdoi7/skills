@@ -1,9 +1,18 @@
 # Testing & Quality Gates
 
+## Best Practices Summary
+
+- Test behavior and contract, not implementation detail
+- Use named subtests for scenario coverage
+- Use `t.Parallel()` only when tests are truly isolated
+- Run race detection for concurrent code
+- Use `goleak` when goroutine lifecycle is part of correctness
+- Keep benchmarks and examples executable and current
+
 ## Table of Contents
 
 - [Test Fundamentals](#test-fundamentals)
-- [Testify v1.11.1 Essentials](#testify-v1111-essentials)
+- [Testify Essentials](#testify-essentials)
 - [Table-Driven Tests](#table-driven-tests)
 - [Parallel Testing](#parallel-testing)
 - [Subtests](#subtests)
@@ -61,12 +70,12 @@ func TestUserService_Create(t *testing.T) {
 }
 ```
 
-## Testify v1.11.1 Essentials
+## Testify Essentials
 
-### Add Dependency (Pin Version)
+### Add Dependency
 
 ```bash
-go get github.com/stretchr/testify@v1.11.1
+go get github.com/stretchr/testify
 go mod tidy
 ```
 
@@ -94,7 +103,7 @@ func TestCreateUser(t *testing.T) {
 }
 ```
 
-### High-Value Assertions (v1.11.1)
+### High-Value Assertions
 
 ```go
 func TestResponse(t *testing.T) {
@@ -152,7 +161,6 @@ func TestValidateEmail(t *testing.T) {
     }
 
     for _, tt := range tests {
-        tt := tt // Go < 1.22 需要捕获循环变量
         t.Run(tt.name, func(t *testing.T) {
             got := ValidateEmail(tt.email)
             assert.Equal(t, tt.want, got)
@@ -189,7 +197,6 @@ func TestParseConfig(t *testing.T) {
     }
 
     for _, tt := range tests {
-        tt := tt
         t.Run(tt.name, func(t *testing.T) {
             got, err := ParseConfig([]byte(tt.input))
 
@@ -232,7 +239,6 @@ func TestFetch(t *testing.T) {
     }
 
     for _, tt := range tests {
-        tt := tt  // Capture range variable (Go < 1.22)
         t.Run(tt.name, func(t *testing.T) {
             t.Parallel()  // Each subtest runs in parallel
 
@@ -479,7 +485,7 @@ func TestWithMock(t *testing.T) {
 }
 ```
 
-### Advanced mock Controls (v1.11.1)
+### Advanced Mock Controls
 
 ```go
 func TestProcessor_OrderAndOptionalCalls(t *testing.T) {
@@ -618,7 +624,7 @@ func BenchmarkProcess(b *testing.B) {
     data := generateTestData()
 
     b.ResetTimer()
-    for i := 0; i < b.N; i++ {
+    for b.Loop() {
         Process(data)
     }
 }
@@ -641,7 +647,7 @@ func BenchmarkProcess_Sizes(b *testing.B) {
             data := generateTestDataOfSize(size)
             b.ResetTimer()
 
-            for i := 0; i < b.N; i++ {
+            for b.Loop() {
                 Process(data)
             }
         })

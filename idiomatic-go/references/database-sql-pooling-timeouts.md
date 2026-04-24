@@ -127,10 +127,14 @@ func withTx(ctx context.Context, db *sql.DB, fn func(*sql.Tx) error) error {
 ```go
 func logDBStats(db *sql.DB) {
     s := db.Stats()
-    log.Printf("db open=%d inuse=%d idle=%d wait_count=%d wait=%s idle_closed=%d life_closed=%d",
-        s.OpenConnections, s.InUse, s.Idle,
-        s.WaitCount, s.WaitDuration,
-        s.MaxIdleClosed, s.MaxLifetimeClosed,
+    slog.Info("db pool stats",
+        "open", s.OpenConnections,
+        "in_use", s.InUse,
+        "idle", s.Idle,
+        "wait_count", s.WaitCount,
+        "wait_duration", s.WaitDuration,
+        "max_idle_closed", s.MaxIdleClosed,
+        "max_lifetime_closed", s.MaxLifetimeClosed,
     )
 }
 ```

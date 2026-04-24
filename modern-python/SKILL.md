@@ -1,69 +1,96 @@
 ---
 name: modern-python
-description: Modern Python 3.13+ guidance for modeling domain logic clearly, isolating framework concerns, and writing maintainable sync or async code. Use when writing or refactoring Python, reviewing design, shaping module boundaries, building FastAPI services, or when code is drifting into framework-first layers, DTO churn, or over-abstracted services.
+description: >
+  Use for Python application code work: implementing, debugging, refactoring, or reviewing modules, FastAPI/service boundaries, public SDK entry paths, async/sync behavior, exception semantics, tests, packaging checks, and Python-facing docs tied to code behavior.
 ---
 
 # Modern Python
 
-Use this skill to keep Python code readable, domain-first, and cheap to evolve.
+Keep Python code explicit, boundary-aware, and cheap to evolve.
+
+## Routing Guardrails
+
+- Route out when the task is mainly about CPython internals, bytecode, GIL, GC, or VM implementation.
+- Follow repository conventions first when they conflict with generic examples in this skill.
+- Prefer the smallest guidance that makes the next change safer and clearer.
+
+## Task Modes
+
+- **implementation** — make the smallest clear code change
+- **review** — return concrete findings and minimal fixes
+- **debug** — locate the failure boundary and preserve context
+- **design** — simplify boundaries, public entry paths, and change locality
 
 ## Decision Order
 
-1. Model the domain and boundaries clearly
-2. Preserve correctness and explicit behavior
-3. Localize change and isolate technical dependencies
-4. Optimize readability and maintainability
-5. Optimize performance after measurement
+1. Clarify the boundary and the user-visible behavior
+2. Keep the common path obvious
+3. Preserve correctness and explicit failure semantics
+4. Localize change and isolate technical dependencies
+5. Keep docs, tests, and public entry paths aligned with real behavior
+6. Optimize performance only after measurement
 
-## Core Principles
+## Core Rules
 
-- **Domain language first**: prefer names that match business concepts over framework jargon.
-- **Contexts before layers**: split by capability or bounded context before introducing `api`, `service`, `repository`, or `models`.
-- **Invariants inside, policies outside**: keep state validity in constructors, models, and value objects; keep variable business rules in policy objects or orchestration.
-- **Boundary objects stay at boundaries**: DTOs, Pydantic schemas, ORM rows, and HTTP payloads belong at integration edges; do not mirror domain objects without a reason.
-- **Prefer explicit code**: avoid decorator magic, implicit side effects, and broad exception swallowing.
-- **Default to `loguru`**: use `loguru` for application logging unless the repository already standardizes another logger.
-- **One obvious way per codebase**: choose a consistent pattern and apply it everywhere.
+- Prefer domain language over framework jargon.
+- Split by capability before adding generic `service`, `repository`, or `models` layers.
+- Keep invariants in constructors, models, and value-rich types.
+- Keep policy choices in orchestration or policy objects.
+- Keep transport schemas, ORM rows, and DTOs at the boundary unless they truly are the model.
+- Keep public entry paths short for the common case, and expose deeper control explicitly.
+- Prefer explicit code over hidden side effects, broad exception swallowing, and magic decorators.
+- Keep examples instructional and tests assertive. Do not let one replace the other.
+- Keep sync and async surfaces behaviorally aligned when both are public.
+- Keep release checks small, strong, and tied to user-visible promises.
+- Prefer `loguru` for application logging unless the repository has already standardized another logger.
+- Follow repository conventions for tooling and test style.
+
+## Anti-Patterns
+
+- Do not wrap business flow in broad `except Exception` blocks that return `None`, `False`, or empty containers.
+- Do not hide required input behind `or` defaults, broad `.get()` fallbacks, or excessive optional chaining.
+- Do not clone `api -> service -> repository` pass-through layers unless each layer hides a real decision.
+- Do not mirror every Pydantic schema, ORM row, DTO, and domain type when the contracts do not actually differ.
+- Do not hide I/O, retries, transactions, or validation in decorators that make entry behavior surprising.
+- Do not claim async/sync parity, cancellation safety, or release readiness without tests that exercise those paths.
 
 ## Workflow
 
-1. Determine the primary task:
-   - **Modeling, package split, refactor, API shape, or design review**: read [references/philosophy.md](references/philosophy.md), [references/architecture.md](references/architecture.md), and [references/principles.md](references/principles.md).
-   - **Exceptions, retries, or boundary translation**: read [references/error-handling.md](references/error-handling.md).
-   - **Decorators, wrappers, timing, retry, or FastAPI decorator usage**: read [references/decorators.md](references/decorators.md).
-   - **Context managers, cleanup, `ExitStack`, or `AsyncExitStack`**: read [references/contextlib.md](references/contextlib.md).
-   - **Async execution or cancellation**: read [references/async-concurrency.md](references/async-concurrency.md).
-   - **Tests or review**: read [references/testing.md](references/testing.md) or [references/review-checklist.md](references/review-checklist.md).
+1. Identify the primary need.
+   - **Modeling, refactor, package split, API shape, public entry design, or design review**: read [references/philosophy.md](references/philosophy.md), [references/architecture.md](references/architecture.md), and [references/principles.md](references/principles.md).
+   - **Exceptions, retries, boundary translation, or failure semantics**: read [references/error-handling.md](references/error-handling.md).
+   - **Decorators, wrappers, or public entry ergonomics**: read [references/decorators.md](references/decorators.md) and [references/principles.md](references/principles.md).
+   - **Cleanup, `ExitStack`, `AsyncExitStack`, or resource lifetimes**: read [references/contextlib.md](references/contextlib.md).
+   - **Async execution, cancellation, backpressure, or sync and async parity**: read [references/async-concurrency.md](references/async-concurrency.md).
+   - **Tests, examples, smoke checks, release gates, or review**: read [references/testing.md](references/testing.md) and [references/review-checklist.md](references/review-checklist.md).
+   - **CI, release gates, or compatibility matrices**: read [references/devops.md](references/devops.md).
 2. Load only the reference files needed for the task.
-3. Prefer the simplest design that keeps business rules obvious and change localized.
+3. Prefer the smallest design that keeps behavior obvious and change localized.
 
 ## Quick Reference
 
 | Topic | Use When | Reference |
 | --- | --- | --- |
 | Design Philosophy | Complexity management, abstraction, design review | [references/philosophy.md](references/philosophy.md) |
-| Principles | Naming, decomposition, code review | [references/principles.md](references/principles.md) |
-| Architecture | Context boundaries, layering, DI | [references/architecture.md](references/architecture.md) |
+| Principles | Naming, public entry paths, decomposition, docs guidance | [references/principles.md](references/principles.md) |
+| Architecture | Context boundaries, layering, DI, public facade vs deeper control | [references/architecture.md](references/architecture.md) |
 | Error Handling | Exception taxonomy, retries, API translation | [references/error-handling.md](references/error-handling.md) |
 | Decorators | Typed wrappers, retries, timing, composition order | [references/decorators.md](references/decorators.md) |
 | Contextlib | `suppress`, `closing`, `ExitStack`, async cleanup | [references/contextlib.md](references/contextlib.md) |
-| Async & Concurrency | `asyncio`, task groups, backpressure | [references/async-concurrency.md](references/async-concurrency.md) |
-| Testing | pytest strategy, fakes, coverage | [references/testing.md](references/testing.md) |
-| DevOps | `uv`, Docker, deployment workflow | [references/devops.md](references/devops.md) |
+| Async & Concurrency | `asyncio`, task groups, backpressure, sync and async parity | [references/async-concurrency.md](references/async-concurrency.md) |
+| Testing | pytest strategy, examples vs tests, smoke-feature-integration-release layers | [references/testing.md](references/testing.md) |
+| DevOps | `uv`, CI, release gate, compatibility matrix | [references/devops.md](references/devops.md) |
 | Review | Focused review checklist | [references/review-checklist.md](references/review-checklist.md) |
 
 ## Essential Patterns
 
-### Type Hints and Value-Rich Types
+### Keep the Common Entry Short, Keep Deeper Control Explicit
 
 ```python
-from enum import StrEnum
+client = connect()
 
-class OrderStatus(StrEnum):
-    PENDING = "pending"
-    PAID = "paid"
-
-def load_orders(ids: list[int]) -> list["Order"]: ...
+config = Config(timeout=5, retries=2)
+client = Client(config)
 ```
 
 ### Preserve Error Context
@@ -72,21 +99,24 @@ def load_orders(ids: list[int]) -> list["Order"]: ...
 try:
     result = risky_operation()
 except ValueError as e:
-    raise BusinessError("Operation failed") from e
+    raise BusinessError("operation failed") from e
 ```
 
-### Logging and Cleanup
+### Keep Dual Surfaces Aligned
 
 ```python
-from loguru import logger
-from contextlib import AsyncExitStack
-
-logger.info("Processing order {}", order_id)
-
-async with AsyncExitStack() as stack:
-    conn = await stack.enter_async_context(get_connection())
-    await handle(conn)
+data = fetch_user(user_id)
+data = await fetch_user_async(user_id)
 ```
+
+## Output Contract
+
+Use this shape for review and design tasks.
+
+- **Finding** — identify the concrete problem
+- **Why it matters** — explain the behavioral or maintenance cost
+- **Minimal change** — propose the smallest fix worth making
+- **Validation** — state how to verify the fix
 
 ## Change Preview Mode
 
@@ -94,12 +124,32 @@ Use this mode when the user asks for `dryrun`, `预演`, `先看方案`, `先不
 
 - Do not modify files.
 - Return `Intent`, `Files`, `Patch Preview`, `Validation Plan`, `Risk Notes`, and `Next Action`.
-- Prefer minimal, reversible previews and call out assumptions explicitly.
+- Prefer minimal, reversible previews.
+- State assumptions explicitly.
+
+## Trigger Eval Prompts
+
+Use these prompts when tuning routing or checking neighboring skill competition.
+
+Should trigger:
+
+- Fix this Python async task cancellation bug; shutdown hangs.
+- Review this FastAPI module boundary; the service and repository layers feel like pass-through code.
+- Refactor this Python SDK quickstart so sync and async clients expose the same behavior.
+- Tighten Python exception handling so DB errors preserve context.
+
+Should stay quiet:
+
+- Rewrite this README to sound less AI.
+- Design OpenAPI endpoints and Problem JSON for orders.
+- Split this domain into bounded contexts before choosing language.
+- Commit these changes as two Conventional Commits.
+- Explain CPython GIL internals.
+- Draw an ASCII architecture diagram.
 
 ## Tooling
 
 ```toml
-# pyproject.toml
 [tool.ruff]
 line-length = 88
 select = ["E", "F", "I", "UP", "B", "SIM"]
@@ -109,7 +159,6 @@ quote-style = "double"
 ```
 
 ```bash
-# Format and lint
 ruff format .
 ruff check --fix .
 ```

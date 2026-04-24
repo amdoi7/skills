@@ -380,7 +380,7 @@ func BenchmarkProcess(b *testing.B) {
     data := generateTestData()
 
     b.ResetTimer()  // Exclude setup time
-    for i := 0; i < b.N; i++ {
+    for b.Loop() {
         process(data)
     }
 }
@@ -391,7 +391,7 @@ func BenchmarkProcessAllocs(b *testing.B) {
 
     b.ReportAllocs()
     b.ResetTimer()
-    for i := 0; i < b.N; i++ {
+    for b.Loop() {
         process(data)
     }
 }
