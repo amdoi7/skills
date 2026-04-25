@@ -98,6 +98,26 @@ Use only when the user explicitly asks to initialize a Go repo, scaffold a servi
 - Log an error or return it at a layer, not both.
 - Prefer behavior-focused tests over implementation-detail tests.
 - Prefer specific domain types over stringly typed parameters.
+- Use practical functional style when it keeps behavior local and explicit: pure domain functions, rule/middleware composition, closures for configuration, and simple `for` loops.
+- Avoid custom `Result`, `Option`, `IO`, Monad-style APIs, or generic pipelines unless they are already a project-wide convention with repeated real use.
+
+## Practical Functional Go
+
+Go can use functional style when it makes rules easier to name, test, and compose without hiding control flow. Prefer ordinary functions, loops, closures, and explicit `error` returns over monadic APIs.
+
+Good fits:
+- Pure domain rules such as `CanPay(order) error` or `PayOrder(order, amount) (Order, error)`.
+- Value objects that return new values, such as `Money.Add(other) (Money, error)`.
+- Rule lists for validation, risk checks, permission checks, coupon policy, and order state transitions: `type Rule[T any] func(T) error`.
+- HTTP middleware and decorators: `func(http.Handler) http.Handler`, logging, auth, retry, timeout, rate limit, or circuit breaker wrappers.
+- Slice filtering and mapping with a `for` loop, plus named predicates or transforms when they improve domain language.
+- Concurrent pipelines with channels only when work is truly streaming, cancellable, or parallel.
+- Strategy functions for pricing, sorting, filtering, scoring, or calculation policy.
+
+Avoid:
+- `Result[T].Map(...).FlatMap(...)` for ordinary `if err != nil` flow.
+- `Option[T]` where `(T, bool)` or `(T, error)` is clearer.
+- Generic `Pipeline[T]` wrappers around already simple middleware, loops, or handlers.
 
 ## Workflow
 
@@ -172,6 +192,9 @@ Should trigger:
 - Fix Go error wrapping around repository calls so callers can use `errors.Is`.
 - Refactor these Go interfaces; mocks are driving awkward package boundaries.
 - Add behavior tests and a race check for worker-pool cancellation.
+- Review this Go code that uses `Result[T].Map` / `FlatMap` for ordinary error handling.
+- Simplify this Go `Map` / `Filter` slice pipeline into idiomatic code.
+- Show where functional style is useful in this Go domain code without overengineering it.
 
 Should stay quiet:
 
